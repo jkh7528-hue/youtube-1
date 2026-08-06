@@ -7,6 +7,7 @@ import {
   Lightning as LightningIcon,
   Drop,
   MonitorPlay,
+  Atom,
 } from "@phosphor-icons/react/ssr";
 import Container from "../ui/Container";
 import SectionHeading from "../ui/SectionHeading";
@@ -30,10 +31,26 @@ export default function QualitySystem() {
         <SectionHeading
           eyebrow="Quality Assurance"
           title="품질보증 체계 및 검사 인프라"
-          desc="KEPIC · ISO 9001 기준의 품질경영시스템과 자체 검사 인프라를 통해 설계부터 출하까지 전 공정의 신뢰성을 확보합니다."
+          desc="국내외 원전 납품 경험에서 축적된 품질 기준과 ISO 9001 품질경영시스템, 자체 검사 인프라를 통해 설계부터 출하까지 전 공정의 신뢰성을 확보합니다."
         />
 
-        <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div className="mt-10 flex flex-col items-start gap-5 rounded-lg bg-navy-900 p-7 sm:flex-row sm:items-center sm:p-8">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-electric-600/15 text-electric-400">
+            <Atom size={28} weight="bold" />
+          </div>
+          <div>
+            <p className="text-xs font-bold tracking-[0.2em] text-electric-400 uppercase">
+              Nuclear-Grade Reliability
+            </p>
+            <p className="mt-1.5 text-base leading-relaxed font-medium text-white sm:text-lg">
+              국내외 원자력발전소에 다수의 계측제어설비를 납품해 온 경험이, 지금의 KESco 품질 기준의
+              시작입니다. 원전에서 요구되는 엄격한 신뢰성 기준을 반도체·이차전지 등 모든 산업 현장에
+              동일하게 적용합니다.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2">
           {certifications.map((cert) => (
             <div key={cert.id} className="rounded-lg border border-navy-900/10 bg-grey-50 p-6">
               <div className="flex items-start justify-between gap-3">

@@ -9,7 +9,7 @@ import HistoryTimeline from "@/components/about/HistoryTimeline";
 export const metadata: Metadata = {
   title: "회사소개",
   description:
-    "한국엔지니어링서비스(KES)의 CEO 인사말, 기업 비전, ISO 9001·KEPIC 품질보증 체계 및 검사 인프라, 2009년부터의 연혁을 소개합니다.",
+    "한국엔지니어링서비스(KESco)의 CEO 인사말, 기업 비전, 국내외 원전 납품실적과 ISO 9001 품질보증 체계 및 검사 인프라, 2009년부터의 연혁을 소개합니다.",
 };
 
 export default function AboutPage() {

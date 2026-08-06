@@ -1,7 +1,7 @@
 import { SealCheck, Handshake, ShieldCheck, Clock } from "@phosphor-icons/react/ssr";
 import Container from "../ui/Container";
 import SectionHeading from "../ui/SectionHeading";
-import { coreStrengths } from "@/data/company";
+import { coreStrengths, company } from "@/data/company";
 
 const icons = {
   "seal-check": SealCheck,
@@ -15,7 +15,7 @@ export default function CoreStrengths() {
     <section className="bg-white py-20 sm:py-24">
       <Container>
         <SectionHeading
-          eyebrow="Why KES"
+          eyebrow={`Why ${company.nameShort}`}
           title="신뢰할 수 있는 자동제어 파트너"
           desc="설계부터 시운전, 사후관리까지 — 품질과 안전을 최우선으로 하는 엔지니어링 역량으로 고객의 프로젝트를 완성합니다."
         />

@@ -6,7 +6,7 @@ export const company = {
   nameKo: "한국엔지니어링서비스",
   nameKoFull: "(주)한국엔지니어링서비스",
   nameEn: "Korea Engineering Service Co., Ltd.",
-  nameShort: "KES",
+  nameShort: "KESco",
   ceo: "정성일",
   founded: "2009-01-01",
   foundedYear: 2009,
@@ -41,12 +41,12 @@ export const navSub: Record<string, { href: string; label: string; desc: string 
   "/about": [
     { href: "/about#ceo", label: "CEO 인사말", desc: "경영철학과 비전" },
     { href: "/about#vision", label: "기업 비전", desc: "미션 · 비전 · 핵심가치" },
-    { href: "/about#quality", label: "품질보증 체계", desc: "KEPIC · ISO 9001 · 검사 인프라" },
+    { href: "/about#quality", label: "품질보증 체계", desc: "ISO 9001 · 원전 납품실적 · 검사 인프라" },
     { href: "/about#history", label: "연혁", desc: "2009 ~ 현재" },
   ],
   "/business": [
-    { href: "/business#track1", label: "Track 1. 산업용 자동화", desc: "PLC · HMI 턴키 솔루션" },
-    { href: "/business#track2", label: "Track 2. 원전·특수 플랜트", desc: "원전 & 대형 특수 플랜트 제어반" },
+    { href: "/business#track1", label: "Track 1. 원전·특수 플랜트", desc: "원전 & 대형 특수 플랜트 제어반" },
+    { href: "/business#track2", label: "Track 2. 산업용 자동화", desc: "PLC · HMI 턴키 솔루션" },
     { href: "/business#process", label: "5단계 공정 프로세스", desc: "상담부터 시운전까지" },
   ],
   "/products": [
@@ -88,19 +88,7 @@ export const certifications = [
     iafCode: "SI Program",
   },
   {
-    id: "kepic",
-    title: "KEPIC MN / EN",
-    subtitle: "원자력 기자재 품질보증 등록",
-    issuer: "한국전력기술인협회(KEPIC)",
-    number: "KEPIC-MN 24-00XX (예시)",
-    scope: "원자력발전소 계측제어설비 및 전기 기자재 설계·제작·시험",
-    firstIssued: "2017-05-01",
-    issued: "2024-05-01",
-    validUntil: "2027-04-30",
-    iafCode: "MN, EN",
-  },
-  {
-    id: "kesco",
+    id: "kosha",
     title: "KOSHA / 전기안전 자체검사 등록업체",
     subtitle: "전기설비 안전 자격 등록",
     issuer: "한국전기안전공사",
@@ -127,11 +115,15 @@ export const partners = [
 export const history = [
   {
     year: "2009",
-    items: ["01월 (주)한국엔지니어링서비스 법인 설립 (광주광역시 광산구)", "계측시험장비 · 자동제어시스템 설계/제작 사업 개시"],
+    items: ["01월 (주)한국엔지니어링서비스 법인 설립 (광주광역시 광산구)", "발전설비 보조장비 및 계측시험장비 설계/제작 사업으로 출발"],
+  },
+  {
+    year: "2011",
+    items: ["국내 원자력발전소向 계측제어설비 최초 납품", "이후 국내외 다수 발전소로 공급처 확대"],
   },
   {
     year: "2012",
-    items: ["산업용 PLC·HMI 통합 제어반 제작 라인 구축", "반도체 협력사向 계측 제어반 최초 납품"],
+    items: ["원전에서 축적한 품질 노하우를 바탕으로 산업용 PLC·HMI 제어반 라인 구축", "반도체 협력사向 계측 제어반 최초 납품"],
   },
   {
     year: "2016",
@@ -143,11 +135,11 @@ export const history = [
   },
   {
     year: "2020",
-    items: ["원전 보조기기 설계/제작 KEPIC 등록 (MN·EN)", "방폭(Ex-proof)·내진 특수 판넬 라인 신설"],
+    items: ["해외 원전 프로젝트向 납품 실적 추가", "방폭(Ex-proof)·내진 특수 판넬 라인 신설"],
   },
   {
     year: "2022",
-    items: ["Rockwell Automation PartnerNetwork Bronze System Integrator 인증", "대형 특수 플랜트 제어반 Track 2 사업부 분리 운영"],
+    items: ["Rockwell Automation PartnerNetwork Bronze System Integrator 인증", "대형 특수 플랜트 제어반 사업부 확대 운영"],
   },
   {
     year: "2023",
@@ -155,18 +147,23 @@ export const history = [
   },
   {
     year: "2025",
-    items: ["24시간 도면 검토/견적 대응 고객지원 체계 오픈", "누적 턴키 프로젝트 350건 돌파 (누계 기준)"],
+    items: ["24시간 도면 검토/견적 대응 고객지원 체계 오픈", "국내외 원전 및 산업 현장 누적 턴키 프로젝트 350건 돌파 (누계 기준)"],
   },
 ];
 
 export const stats = [
   { label: "설립", value: "2009", unit: "년" },
-  { label: "누적 프로젝트", value: "350", unit: "건 +" },
+  { label: "원전 납품 실적", value: "다수 프로젝트", unit: "" },
   { label: "품질 인증", value: "ISO 9001", unit: "" },
   { label: "SI 등급", value: "Rockwell Bronze", unit: "" },
 ];
 
 export const coreStrengths = [
+  {
+    title: "국내외 원전 다수 납품실적",
+    desc: "국내외 원자력발전소에 계측제어설비 및 발전설비 보조장비를 다수 납품해 온 실적을 기반으로, 원전 수준의 엄격한 품질 기준을 모든 사업에 동일하게 적용합니다.",
+    icon: "shield-check",
+  },
   {
     title: "ISO 9001 품질보증 체계",
     desc: "설계 → 제작 → 검사 전 과정에 걸친 품질경영시스템으로 산업용 자동제어시스템의 신뢰성을 보증합니다.",
@@ -176,11 +173,6 @@ export const coreStrengths = [
     title: "Rockwell Automation 공인 SI",
     desc: "Bronze System Integrator 인증을 통해 Control · Process · Power · Information 전 영역의 통합 솔루션을 제공합니다.",
     icon: "hand-shake",
-  },
-  {
-    title: "원전 · 특수 플랜트 실적",
-    desc: "KEPIC 등록 기반의 원자력 발전설비 보조장비 및 대형 특수 플랜트 제어반 설계/제작 역량을 보유하고 있습니다.",
-    icon: "shield-check",
   },
   {
     title: "24시간 도면 검토 대응",
@@ -193,9 +185,23 @@ export const businessTracks = [
   {
     id: "track1",
     tag: "Track 1",
+    title: "원전 & 대형 특수 플랜트 제어반",
+    subtitle: "Nuclear & Special Plant Control Panel",
+    desc: "국내외 원자력발전소에 계측제어설비 및 전기 기자재를 다수 납품해 온 실적을 기반으로, 극도로 엄격한 원전 품질 기준에 맞춰 대형 특수 플랜트向 내진/방폭 사양 제어반을 설계·제작합니다.",
+    features: [
+      "국내외 원자력발전소 다수 납품 실적 보유",
+      "내진(Seismic) / 방폭(Ex-proof) 사양 특수 판넬 제작",
+      "발전설비 보조장비 및 계측시험장비 설계/제작",
+      "발주처 입회 시험(FAT/SAT) 및 원전 수준의 품질 검사 대응",
+    ],
+    industries: ["원자력발전", "화력/복합화력 발전", "가스/석유화학 플랜트", "특수 방산 설비"],
+  },
+  {
+    id: "track2",
+    tag: "Track 2",
     title: "산업용 자동화 PLC·HMI 턴키",
     subtitle: "Industrial Automation Turnkey Solution",
-    desc: "반도체, 이차전지, 식음료, 수처리 등 다양한 산업 현장에 최적화된 PLC/HMI 기반 자동제어 시스템을 설계부터 시운전까지 턴키로 제공합니다.",
+    desc: "원전 설비에서 축적한 엄격한 품질 기준과 엔지니어링 노하우를 바탕으로, 반도체·이차전지·수처리 등 첨단 산업 현장에 최적화된 PLC/HMI 기반 자동제어 시스템을 설계부터 시운전까지 턴키로 제공합니다.",
     features: [
       "PLC/HMI 프로그래밍 및 통합 SCADA 구축",
       "MCC(모터제어반) · 수배전반 설계/제작",
@@ -204,27 +210,13 @@ export const businessTracks = [
     ],
     industries: ["반도체", "이차전지(EV Battery)", "수처리", "식음료/제약", "물류/자동창고"],
   },
-  {
-    id: "track2",
-    tag: "Track 2",
-    title: "원전 & 대형 특수 플랜트 제어반",
-    subtitle: "Nuclear & Special Plant Control Panel",
-    desc: "KEPIC 기준에 따른 원자력 발전설비 보조장비 및 대형 특수 플랜트向 내진/방폭 사양 제어반을 설계·제작하며, 엄격한 품질 검증 절차를 적용합니다.",
-    features: [
-      "KEPIC MN/EN 기준 설계 및 QA 문서 관리",
-      "내진(Seismic) / 방폭(Ex-proof) 사양 특수 판넬 제작",
-      "발전설비 보조장비 및 계측시험장비 설계/제작",
-      "발주처 입회 시험(FAT/SAT) 및 품질 검사 대응",
-    ],
-    industries: ["원자력발전", "화력/복합화력 발전", "가스/석유화학 플랜트", "특수 방산 설비"],
-  },
 ];
 
 export const processSteps = [
   {
     step: "01",
     title: "상담 및 요구사항 분석",
-    desc: "고객 요청 사항, 설치 환경, 관련 규격(KS/IEC/KEPIC 등)을 분석하여 최적 사양을 도출합니다.",
+    desc: "고객 요청 사항, 설치 환경, 관련 규격(KS/IEC 등)을 분석하여 최적 사양을 도출합니다.",
   },
   {
     step: "02",
@@ -275,7 +267,7 @@ export const productCategories = [
     title: "방폭 · 내진 특수 판넬",
     titleEn: "Explosion-proof / Seismic Panel",
     desc: "위험물 취급 구역 및 지진하중 고려가 필요한 플랜트向 방폭(Ex-proof)·내진(Seismic) 인증 사양 판넬입니다.",
-    tags: ["Ex-proof d IIB", "내진 1등급", "KEPIC 대응"],
+    tags: ["Ex-proof d IIB", "내진 1등급", "원전 납품 실적 기반"],
   },
 ];
 
@@ -312,7 +304,7 @@ export const specTable = [
     voltage: "AC 220V/380V/440V",
     current: "정격 100~2,000A",
     ip: "IP65 (방폭: Ex-proof d IIB T4)",
-    standard: "KEPIC MN/EN, KS C IEC 60079",
+    standard: "KS C IEC 60079 (방폭), IEEE 344 (내진 검증)",
     material: "STS316L / 알루미늄 다이캐스팅",
     finish: "내식 특수도장",
   },
@@ -329,7 +321,7 @@ export const faqs = [
   },
   {
     q: "원전/특수 플랜트向 제어반도 제작이 가능한가요?",
-    a: "당사는 KEPIC MN/EN 등록업체로서 원자력 발전설비 보조장비 및 내진/방폭 사양의 특수 플랜트 제어반 설계·제작 실적을 보유하고 있습니다.",
+    a: "네, 저희는 국내외 원자력발전소에 계측제어설비 및 발전설비 보조장비를 다수 납품해 온 실적을 보유하고 있으며, 이 경험을 바탕으로 내진/방폭 사양의 특수 플랜트 제어반을 설계·제작합니다.",
   },
   {
     q: "소량 맞춤 제작(커스터마이징)도 대응하나요?",
@@ -344,8 +336,8 @@ export const faqs = [
     a: "납품 및 시운전(SAT) 이후 정기 점검 서비스를 제공하며, 긴급 장애 발생 시 원격/현장 기술지원을 통해 신속히 대응합니다.",
   },
   {
-    q: "품질 인증서(ISO, KEPIC 등) 사본을 제공받을 수 있나요?",
-    a: "네, 계약 진행 또는 입찰 참여 시 ISO 9001, KEPIC 등록증 등 관련 인증서 사본을 공식적으로 제공해 드립니다.",
+    q: "품질 인증서(ISO 9001 등) 사본을 제공받을 수 있나요?",
+    a: "네, 계약 진행 또는 입찰 참여 시 ISO 9001 인증서 등 관련 서류와 원전 납품 실적 증빙 자료를 공식적으로 제공해 드립니다.",
   },
 ];
 

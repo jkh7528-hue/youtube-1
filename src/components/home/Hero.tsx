@@ -3,7 +3,7 @@ import Container from "../ui/Container";
 import Button from "../ui/Button";
 import Badge from "../ui/Badge";
 import SchematicArt from "../ui/SchematicArt";
-import { stats } from "@/data/company";
+import { company, stats } from "@/data/company";
 
 export default function Hero() {
   return (
@@ -16,16 +16,17 @@ export default function Hero() {
 
       <Container className="relative grid grid-cols-1 items-center gap-12 pt-20 pb-20 sm:pt-24 sm:pb-28 lg:grid-cols-[1.1fr_0.9fr] lg:pt-16">
         <div>
-          <Badge tone="dark">Since 2009 · Gwangju, Korea</Badge>
+          <Badge tone="dark">국내외 원전 다수 납품 · Since 2009</Badge>
           <h1 className="mt-6 text-4xl leading-[1.15] font-bold tracking-tight text-white sm:text-5xl lg:text-[3.2rem]">
-            정밀 제어로 완성하는
+            원전이 증명한 신뢰로
             <br />
-            <span className="text-electric-400">산업 자동화</span>의 표준
+            완성하는 <span className="text-electric-400">산업 자동화</span>
           </h1>
           <p className="mt-6 max-w-xl text-base leading-relaxed text-grey-200 sm:text-lg">
-            한국엔지니어링서비스(KES)는 산업용 PLC·HMI 턴키 솔루션부터 원전 및
-            대형 특수 플랜트 제어반까지, ISO 9001 품질보증 체계 아래 설계·제작·검사·시운전을
-            일괄 수행하는 전기 자동제어 전문기업입니다.
+            {company.nameKo}({company.nameShort})는 국내외 원자력발전소에 계측제어설비를 다수
+            납품해 온 실적을 기반으로, 반도체·이차전지 등 산업용 자동화 전 영역으로 전문성을
+            넓혀 온 전기·자동제어 전문기업입니다. ISO 9001 품질보증 체계 아래 설계·제작·검사·시운전을
+            일괄 수행합니다.
           </p>
           <div className="mt-9 flex flex-col gap-3 sm:flex-row">
             <Button href="/business" variant="primary" icon={<ArrowRight size={18} weight="bold" />}>

@@ -22,25 +22,26 @@ const robotoMono = Roboto_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL("https://kes-engineering.example.com"),
   title: {
-    default: `${company.nameKo} | 산업용 자동화 · 원전 특수 플랜트 제어반 전문기업`,
+    default: `${company.nameKo} | 원전 특수 플랜트 · 산업용 자동화 제어반 전문기업`,
     template: `%s | ${company.nameKo}`,
   },
   description:
-    "한국엔지니어링서비스(KES)는 2009년 설립된 전기·PLC 자동제어 전문 엔지니어링 기업입니다. 산업용 자동화 PLC/HMI 턴키, 원전·특수 플랜트 제어반을 ISO 9001 품질보증 체계로 공급합니다.",
+    `한국엔지니어링서비스(${company.nameShort})는 2009년 설립된 전기·PLC 자동제어 전문 엔지니어링 기업입니다. 국내외 원자력발전소 다수 납품 실적을 기반으로 산업용 자동화 PLC/HMI 턴키, 원전·특수 플랜트 제어반을 ISO 9001 품질보증 체계로 공급합니다.`,
   keywords: [
     "PLC 제어반",
     "자동제어시스템",
     "수배전반",
     "원전 제어반",
+    "원전 계측제어설비",
     "MCC 제작",
     "한국엔지니어링서비스",
-    "KEPIC",
+    "KESco",
     "ISO 9001",
   ],
   openGraph: {
-    title: `${company.nameKo} | 산업용 자동화 · 원전 특수 플랜트 제어반 전문기업`,
+    title: `${company.nameKo} | 원전 특수 플랜트 · 산업용 자동화 제어반 전문기업`,
     description:
-      "설계부터 시운전까지, 정밀 제어 자동화 턴키 솔루션. ISO 9001 · Rockwell Automation 공인 System Integrator.",
+      "국내외 원전 다수 납품 실적을 기반으로, 설계부터 시운전까지 정밀 제어 자동화 턴키 솔루션을 제공합니다. ISO 9001 · Rockwell Automation 공인 System Integrator.",
     locale: "ko_KR",
     type: "website",
   },
