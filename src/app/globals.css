@@ -1,28 +1,21 @@
 @import "tailwindcss";
 
 @theme {
-  /* Brand palette */
-  --color-navy-950: #060d18;
-  --color-navy-900: #0b192c;
-  --color-navy-800: #112238;
-  --color-navy-700: #1a3350;
-  --color-navy-600: #244469;
-  --color-navy-500: #34567e;
+  --color-bg: #09090b;
+  --color-surface: #18181b;
+  --color-surface-hover: #202024;
+  --color-border: #27272a;
 
-  --color-grey-50: #f8fafc;
-  --color-grey-100: #f1f5f9;
-  --color-grey-200: #e2e8f0;
-  --color-grey-300: #cbd5e1;
+  /* 심정지 (cardiac arrest / flatlined) */
+  --color-cardiac: #fb7185;
+  --color-cardiac-dim: #4c1d24;
 
-  --color-electric-50: #f0f9ff;
-  --color-electric-100: #e0f2fe;
-  --color-electric-400: #38bdf8;
-  --color-electric-500: #0ea5e9;
-  --color-electric-600: #0284c7;
-  --color-electric-700: #0369a1;
-  --color-electric-800: #075985;
+  /* 급상승 (trending / rising) */
+  --color-trending: #fbbf24;
+  --color-trending-dim: #4a3a0e;
 
-  --font-sans: var(--font-noto-sans-kr), "Noto Sans KR", "Malgun Gothic", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-noto-sans-kr), "Noto Sans KR", "Malgun Gothic", ui-sans-serif, system-ui,
+    sans-serif;
   --font-mono: var(--font-roboto-mono), "Roboto Mono", ui-monospace, monospace;
 
   --container-8xl: 90rem;
@@ -30,61 +23,48 @@
 
 html {
   scroll-behavior: smooth;
-  scroll-padding-top: 96px;
+  color-scheme: dark;
 }
 
 body {
-  background-color: var(--color-grey-50);
-  color: var(--color-navy-900);
+  background-color: var(--color-bg);
+  color: #e4e4e7;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 ::selection {
-  background-color: var(--color-electric-600);
-  color: white;
+  background-color: var(--color-cardiac);
+  color: #09090b;
 }
 
-/* Blueprint grid backdrop used across hero / CTA sections */
-.bp-grid {
-  background-image:
-    linear-gradient(rgba(148, 197, 235, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 197, 235, 0.08) 1px, transparent 1px);
-  background-size: 40px 40px;
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: #3f3f46;
+  border-radius: 999px;
+  border: 2px solid var(--color-bg);
 }
 
-.bp-grid-fine {
-  background-image:
-    linear-gradient(rgba(148, 197, 235, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 197, 235, 0.06) 1px, transparent 1px);
-  background-size: 12px 12px;
-}
-
-/* Marquee for partner/certification band */
-@keyframes marquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
-}
-
-.animate-marquee {
-  animation: marquee 32s linear infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-  .animate-marquee {
-    animation: none;
-  }
-}
-
-/* Numeric / spec table figures */
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+@keyframes pulse-line {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.animate-pulse-line {
+  animation: pulse-line 1.6s ease-in-out infinite;
 }

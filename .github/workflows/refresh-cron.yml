@@ -1,0 +1,24 @@
+name: Refresh YouTube stats
+
+# Polls the deployed app's cron endpoint on a schedule so VPH keeps updating.
+#
+# Setup (Settings → Secrets and variables → Actions on this repo):
+#   - Variable SITE_URL   → e.g. https://your-app.vercel.app (no trailing slash)
+#   - Secret   CRON_SECRET → same value as the CRON_SECRET env var on the deployment
+#
+# You can also trigger a run manually from the Actions tab (workflow_dispatch).
+on:
+  schedule:
+    - cron: "0 * * * *" # every hour, on the hour (UTC)
+  workflow_dispatch: {}
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call refresh endpoint
+        run: |
+          curl --fail --show-error --silent \
+            --max-time 280 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ vars.SITE_URL }}/api/cron/refresh"

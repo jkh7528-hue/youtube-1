@@ -1,0 +1,89 @@
+import Link from "next/link";
+import { Heartbeat, Flame, Play } from "@phosphor-icons/react/dist/ssr";
+import { formatCompactKo, formatRelativeTime, formatVph } from "@/lib/format";
+import type { VideoWithChannel } from "@/lib/types";
+
+export default function VideoCard({
+  video,
+  mode,
+}: {
+  video: VideoWithChannel;
+  mode: "trending" | "cardiac";
+}) {
+  const youtubeUrl = `https://www.youtube.com/watch?v=${video.youtube_video_id}`;
+
+  return (
+    <div className="group flex flex-col overflow-hidden rounded-xl border border-border bg-surface transition-colors hover:border-zinc-700">
+      <a
+        href={youtubeUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="relative block aspect-video overflow-hidden bg-zinc-800"
+      >
+        {video.thumbnail_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={video.thumbnail_url}
+            alt={video.title}
+            loading="lazy"
+            className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-zinc-600">
+            <Play size={28} />
+          </div>
+        )}
+        <span
+          className={`absolute left-2 top-2 flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-bold backdrop-blur ${
+            mode === "cardiac"
+              ? "bg-cardiac-dim/90 text-cardiac"
+              : "bg-trending-dim/90 text-trending"
+          }`}
+        >
+          {mode === "cardiac" ? <Heartbeat size={12} weight="fill" /> : <Flame size={12} weight="fill" />}
+          {mode === "cardiac" ? "심정지" : "급상승"}
+        </span>
+        {video.is_short && (
+          <span className="absolute right-2 top-2 rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-200">
+            SHORTS
+          </span>
+        )}
+      </a>
+
+      <div className="flex flex-1 flex-col gap-2 p-3">
+        <a href={youtubeUrl} target="_blank" rel="noreferrer">
+          <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-zinc-100 group-hover:text-white">
+            {video.title}
+          </h3>
+        </a>
+
+        <Link
+          href={`/channels/${video.channel.id}`}
+          className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300"
+        >
+          {video.channel.thumbnail_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={video.channel.thumbnail_url}
+              alt=""
+              className="h-4 w-4 rounded-full object-cover"
+            />
+          )}
+          <span className="truncate">{video.channel.title}</span>
+        </Link>
+
+        <div className="mt-auto flex items-center justify-between border-t border-border pt-2 text-xs tabular">
+          <span className="text-zinc-400">
+            조회수 <span className="font-semibold text-zinc-200">{formatCompactKo(video.latest_view_count)}</span>
+          </span>
+          <span
+            className={`font-semibold ${mode === "cardiac" ? "text-cardiac" : "text-trending"}`}
+          >
+            {formatVph(video.recent_vph)} 회/h
+          </span>
+        </div>
+        <div className="text-[11px] text-zinc-600">{formatRelativeTime(video.published_at)} 게시</div>
+      </div>
+    </div>
+  );
+}
