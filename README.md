@@ -65,21 +65,17 @@ npm run dev
 ### 5. 주기적 수집(cron) 연결 — 필수
 
 `POST/GET /api/cron/refresh`를 `Authorization: Bearer <CRON_SECRET>` 헤더와 함께 주기적으로
-호출해야 새 영상이 발견되고 VPH가 계산됩니다. 아래 둘 중 하나만 설정하면 됩니다.
+호출해야 새 영상이 발견되고 VPH가 계산됩니다.
 
-**옵션 A — GitHub Actions (권장, 무료)**
+**GitHub Actions로 연결 (권장, 무료)**
 
 이미 `.github/workflows/refresh-cron.yml`이 포함돼 있습니다 (매시 정각 실행).
 저장소 Settings → Secrets and variables → Actions에서:
 - Variable `SITE_URL` = 배포된 주소 (예: `https://your-app.vercel.app`)
 - Secret `CRON_SECRET` = `.env`의 `CRON_SECRET`과 동일한 값
 
-**옵션 B — Vercel Cron**
-
-`vercel.json`에 `/api/cron/refresh`를 매시 호출하도록 이미 설정돼 있습니다. Vercel
-프로젝트에 `CRON_SECRET` 환경변수를 설정하면, Vercel이 자동으로
-`Authorization: Bearer $CRON_SECRET` 헤더를 붙여 호출합니다. **주의**: Hobby 플랜은 하루
-1회로 제한되므로(정확도가 크게 떨어짐) 옵션 A를 권장합니다. 둘 다 설정할 필요는 없습니다.
+> Vercel 자체 Cron Jobs 기능은 Hobby 플랜에서 하루 1회로 제한돼 있어(매시간 실행 불가,
+> Pro 플랜 필요) 쓰지 않습니다. `vercel.json`에는 cron 설정이 없습니다.
 
 ## 판정 기준 조정
 
