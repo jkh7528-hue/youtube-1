@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getSettings } from "@/lib/settings";
 import type { CategoryRow, ChannelRow, VideoWithChannel } from "@/lib/types";
@@ -6,7 +7,7 @@ import type { CategoryRow, ChannelRow, VideoWithChannel } from "@/lib/types";
 const VIDEO_WITH_CHANNEL_SELECT =
   "*, channel:channels(id, title, thumbnail_url, youtube_channel_id, subscriber_count, is_favorite)";
 
-export async function getCategories(): Promise<CategoryRow[]> {
+export const getCategories = cache(async function getCategories(): Promise<CategoryRow[]> {
   const { data, error } = await supabaseAdmin
     .from("categories")
     .select("*")
@@ -14,7 +15,7 @@ export async function getCategories(): Promise<CategoryRow[]> {
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
   return data ?? [];
-}
+});
 
 async function channelIdsForCategory(categorySlug: string): Promise<string[]> {
   const { data: category } = await supabaseAdmin
@@ -98,6 +99,57 @@ export async function getCardiacArrestVideos(params: VideoListParams = {}): Prom
   return { videos: (data ?? []) as unknown as VideoWithChannel[], settings };
 }
 
+interface ChannelVideoStats {
+  videoCountByChannel: Map<string, number>;
+  cardiacCountByChannel: Map<string, number>;
+}
+
+/**
+ * Per-channel video counts, aggregated in Postgres by the `channel_video_stats`
+ * view (supabase/migrations/0003_channel_stats.sql) — one row per channel.
+ *
+ * The previous version pulled every `videos` row and counted in JS, which both
+ * dominated the /channels response time and silently truncated at PostgREST's
+ * 1000-row default. The fallback below keeps the page working on a database
+ * where migration 0003 hasn't been applied yet; it has the old bug, so run the
+ * migration.
+ */
+async function getChannelVideoStats(channelIds: string[]): Promise<ChannelVideoStats> {
+  const videoCountByChannel = new Map<string, number>();
+  const cardiacCountByChannel = new Map<string, number>();
+
+  const { data, error } = await supabaseAdmin
+    .from("channel_video_stats")
+    .select("channel_id, video_count, cardiac_arrest_count")
+    .in("channel_id", channelIds);
+
+  if (!error) {
+    for (const row of data ?? []) {
+      videoCountByChannel.set(row.channel_id, Number(row.video_count ?? 0));
+      cardiacCountByChannel.set(row.channel_id, Number(row.cardiac_arrest_count ?? 0));
+    }
+    return { videoCountByChannel, cardiacCountByChannel };
+  }
+
+  console.warn(
+    "[queries] channel_video_stats 뷰를 읽지 못해 느린 경로로 대체합니다. " +
+      "supabase/migrations/0003_channel_stats.sql 을 적용하세요. 원인:",
+    error.message
+  );
+
+  const { data: rows } = await supabaseAdmin
+    .from("videos")
+    .select("channel_id, is_cardiac_arrest")
+    .in("channel_id", channelIds);
+  for (const row of rows ?? []) {
+    videoCountByChannel.set(row.channel_id, (videoCountByChannel.get(row.channel_id) ?? 0) + 1);
+    if (row.is_cardiac_arrest) {
+      cardiacCountByChannel.set(row.channel_id, (cardiacCountByChannel.get(row.channel_id) ?? 0) + 1);
+    }
+  }
+  return { videoCountByChannel, cardiacCountByChannel };
+}
+
 export interface ChannelWithCategories extends ChannelRow {
   categories: CategoryRow[];
   videoCount: number;
@@ -114,15 +166,12 @@ export async function getChannels(): Promise<ChannelWithCategories[]> {
 
   const channelIds = channels.map((c) => c.id);
 
-  const [{ data: links }, { data: counts }] = await Promise.all([
+  const [{ data: links }, stats] = await Promise.all([
     supabaseAdmin
       .from("channel_categories")
       .select("channel_id, category:categories(*)")
       .in("channel_id", channelIds),
-    supabaseAdmin
-      .from("videos")
-      .select("channel_id, is_cardiac_arrest")
-      .in("channel_id", channelIds),
+    getChannelVideoStats(channelIds),
   ]);
 
   const categoriesByChannel = new Map<string, CategoryRow[]>();
@@ -132,14 +181,7 @@ export async function getChannels(): Promise<ChannelWithCategories[]> {
     categoriesByChannel.set(link.channel_id, list);
   }
 
-  const videoCountByChannel = new Map<string, number>();
-  const cardiacCountByChannel = new Map<string, number>();
-  for (const row of counts ?? []) {
-    videoCountByChannel.set(row.channel_id, (videoCountByChannel.get(row.channel_id) ?? 0) + 1);
-    if (row.is_cardiac_arrest) {
-      cardiacCountByChannel.set(row.channel_id, (cardiacCountByChannel.get(row.channel_id) ?? 0) + 1);
-    }
-  }
+  const { videoCountByChannel, cardiacCountByChannel } = stats;
 
   return channels.map((c) => ({
     ...c,

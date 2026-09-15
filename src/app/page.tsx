@@ -1,11 +1,29 @@
+import { Suspense } from "react";
 import { getCategories, getTrendingVideos, getCardiacArrestVideos } from "@/lib/queries";
+import { getSettings } from "@/lib/settings";
 import CategoryTabs from "@/components/app/CategoryTabs";
 import ModeToggle from "@/components/app/ModeToggle";
 import RefreshButton from "@/components/app/RefreshButton";
 import VideoGrid from "@/components/app/VideoGrid";
+import VideoGridSkeleton from "@/components/app/VideoGridSkeleton";
 import { formatCompactKo } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
+
+type Mode = "trending" | "cardiac";
+
+/**
+ * The slow half of the page. Kept in its own component so the shell — heading,
+ * category tabs, mode toggle — renders and stays clickable while this streams.
+ */
+async function VideoResults({ mode, category }: { mode: Mode; category?: string }) {
+  const { videos } =
+    mode === "cardiac"
+      ? await getCardiacArrestVideos({ categorySlug: category })
+      : await getTrendingVideos({ categorySlug: category });
+
+  return <VideoGrid videos={videos} mode={mode} />;
+}
 
 export default async function ExplorePage({
   searchParams,
@@ -13,13 +31,10 @@ export default async function ExplorePage({
   searchParams: Promise<{ mode?: string; category?: string }>;
 }) {
   const { mode: rawMode, category } = await searchParams;
-  const mode: "trending" | "cardiac" = rawMode === "cardiac" ? "cardiac" : "trending";
+  const mode: Mode = rawMode === "cardiac" ? "cardiac" : "trending";
 
-  const categories = await getCategories();
-  const { videos, settings } =
-    mode === "cardiac"
-      ? await getCardiacArrestVideos({ categorySlug: category })
-      : await getTrendingVideos({ categorySlug: category });
+  // Two cheap single-table reads, run together — this is all the shell waits on.
+  const [categories, settings] = await Promise.all([getCategories(), getSettings()]);
 
   return (
     <div className="mx-auto max-w-8xl px-4 py-6 sm:px-6">
@@ -42,7 +57,14 @@ export default async function ExplorePage({
         <ModeToggle mode={mode} category={category} />
       </div>
 
-      <VideoGrid videos={videos} mode={mode} />
+      {/*
+        The key is what makes switching tabs feel instant: a changed key
+        re-suspends this boundary, so the skeleton comes back immediately
+        instead of the old list sitting there frozen until the new query lands.
+      */}
+      <Suspense key={`${mode}:${category ?? ""}`} fallback={<VideoGridSkeleton />}>
+        <VideoResults mode={mode} category={category} />
+      </Suspense>
     </div>
   );
 }

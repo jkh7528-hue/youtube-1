@@ -8,6 +8,13 @@ export const dynamic = "force-dynamic";
 // values above 60s, but the field is harmless on other hosts/runtimes.
 export const maxDuration = 300;
 
+// How long one invocation may work before it stops and leaves the rest to the
+// next scheduled run. Must stay under the host's hard function timeout — Vercel
+// Hobby kills the request at 60s, and a killed request returns a 504 with no
+// progress reported, which is what made the hourly cron look permanently broken.
+// Raise CRON_BUDGET_SECONDS on a plan with a longer limit.
+const BUDGET_SECONDS = Number(process.env.CRON_BUDGET_SECONDS ?? 50);
+
 function isAuthorized(request: NextRequest): boolean {
   const secret = env.cronSecret;
   if (!secret) return false; // refuse to run unprotected
@@ -22,7 +29,7 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   try {
-    const summary = await runRefreshJob();
+    const summary = await runRefreshJob({ budgetMs: BUDGET_SECONDS * 1000 });
     return NextResponse.json({ ok: true, ...summary });
   } catch (e) {
     console.error("[cron/refresh] failed:", e);

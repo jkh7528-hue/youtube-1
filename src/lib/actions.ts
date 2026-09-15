@@ -210,11 +210,15 @@ export async function saveSettings(formData: FormData): Promise<{ error?: string
 
 export async function manualRefreshAll(): Promise<{ error?: string; summary?: string }> {
   try {
-    const summary = await runRefreshJob();
+    // Same budget as the cron route: a Server Action runs under the host's
+    // function timeout too, so the button must return progress rather than 504.
+    const summary = await runRefreshJob({ budgetMs: 50_000 });
     revalidatePath("/");
     revalidatePath("/channels");
     return {
-      summary: `채널 ${summary.channelsScanned}개 확인, 신규 영상 ${summary.newVideosDiscovered}개, 통계 갱신 ${summary.videosStatsRefreshed}건, 심정지 누적 ${summary.cardiacArrestCount}건`,
+      summary:
+        `채널 ${summary.channelsScanned}개 확인, 신규 영상 ${summary.newVideosDiscovered}개, 통계 갱신 ${summary.videosStatsRefreshed}건, 심정지 누적 ${summary.cardiacArrestCount}건` +
+        (summary.timedOut ? " (시간 제한으로 일부만 처리했어요. 다음 실행에서 이어서 진행됩니다.)" : ""),
     };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "새로고침 중 오류가 발생했어요." };

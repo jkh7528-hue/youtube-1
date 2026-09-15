@@ -20,8 +20,13 @@ VPH는 유튜브 API가 바로 알려주지 않기 때문에, 이 앱은 주기�
 ### 1. Supabase 프로젝트
 
 1. [supabase.com](https://supabase.com)에서 프로젝트를 만듭니다.
-2. `supabase/migrations/0001_init.sql` → `supabase/migrations/0002_functions.sql` 순서로
-   SQL Editor에서 실행합니다 (또는 Supabase CLI의 `supabase db push`).
+2. `supabase/migrations/` 안의 파일을 번호 순서대로 SQL Editor에서 실행합니다
+   (`0001_init.sql` → `0002_functions.sql` → `0003_channel_stats.sql`).
+   또는 Supabase CLI의 `supabase db push`.
+
+   > **이미 운영 중이라면 `0003_channel_stats.sql`을 꼭 실행하세요.** 관심채널 목록의
+   > 영상/심정지 개수를 DB에서 집계하는 뷰입니다. 없으면 앱이 느린 예전 방식으로 대체
+   > 동작하는데, 그 경로는 영상이 1000개를 넘으면 개수가 잘못 표시됩니다.
 3. Settings → API에서 Project URL, publishable key, secret key(또는 구버전 프로젝트라면
    anon key / service_role key)를 확인합니다.
 
@@ -77,6 +82,10 @@ npm run dev
 > Vercel 자체 Cron Jobs 기능은 Hobby 플랜에서 하루 1회로 제한돼 있어(매시간 실행 불가,
 > Pro 플랜 필요) 쓰지 않습니다. `vercel.json`에는 cron 설정이 없습니다.
 
+이 워크플로는 **항상 성공으로 끝납니다**(exit 0). 매시간 "Run failed" 메일이 오는 걸 막기
+위해서입니다. 대신 매 실행의 **Job Summary**(Actions 탭 → 실행 클릭 → 요약 화면)에 결과나
+실패 원인이 한국어로 적힙니다. 갱신이 안 되는 것 같으면 로그가 아니라 거기를 보세요.
+
 ## 판정 기준 조정
 
 `/settings`에서 다음 값을 바꿀 수 있습니다 (기본값):
@@ -89,10 +98,13 @@ npm run dev
 ## 배포
 
 Vercel에 연결하고(또는 다른 Node 호스팅) 위 환경변수를 프로젝트 설정에 등록한 뒤 배포하면
-됩니다. `src/app/api/cron/refresh/route.ts`는 큰 채널 목록의 전체 백필 때문에 오래 걸릴 수
-있어 `maxDuration = 300`으로 설정돼 있습니다 (Vercel Pro 이상에서만 적용, Hobby는 60초로
-제한됩니다 — 채널 수가 많다면 여러 번의 cron 실행에 걸쳐 나눠서 처리되니 걱정하지 않아도
-됩니다. 코드가 매 실행마다 이어서 진행합니다).
+됩니다.
+
+수집 작업은 호스트가 함수를 강제 종료하기 전에 **스스로 멈추고 다음 실행에 넘깁니다.**
+한 번의 실행이 쓸 수 있는 시간은 `CRON_BUDGET_SECONDS` 환경변수로 정하며 기본값은 **50초**로,
+Vercel Hobby의 60초 하드 리밋 안에 들어갑니다. Pro 이상(최대 300초)이라면 `CRON_BUDGET_SECONDS`를
+`250` 정도로 올리면 한 번에 더 많이 처리합니다. 예산을 넘겨 중단되면 응답 JSON의
+`timedOut`이 `true`가 되고, 다음 실행이 가장 오래된 것부터 이어서 갱신합니다.
 
 ## 아키텍처 메모
 

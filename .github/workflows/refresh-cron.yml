@@ -6,19 +6,86 @@ name: Refresh YouTube stats
 #   - Variable SITE_URL   → e.g. https://your-app.vercel.app (no trailing slash)
 #   - Secret   CRON_SECRET → same value as the CRON_SECRET env var on the deployment
 #
-# You can also trigger a run manually from the Actions tab (workflow_dispatch).
+# This job intentionally always exits 0 so a bad run never sends a "Run failed"
+# email every hour. The outcome — success or the reason it didn't work — is
+# written to the run's Job Summary instead. Check there, not the step log.
 on:
   schedule:
     - cron: "0 * * * *" # every hour, on the hour (UTC)
   workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: refresh-cron
+  cancel-in-progress: false
 
 jobs:
   refresh:
     runs-on: ubuntu-latest
     steps:
       - name: Call refresh endpoint
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          curl --fail --show-error --silent \
-            --max-time 280 \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ vars.SITE_URL }}/api/cron/refresh"
+          set -u
+          note() { echo "$1"; echo "$1" >> "$GITHUB_STEP_SUMMARY"; }
+
+          if [ -z "${SITE_URL}" ]; then
+            note "### ⚠️ 설정 누락: \`SITE_URL\`"
+            note "Settings → Secrets and variables → Actions → **Variables** 탭에서"
+            note "\`SITE_URL\` 변수에 배포 주소(예: \`https://your-app.vercel.app\`, 끝에 \`/\` 없이)를 추가하세요."
+            exit 0
+          fi
+          if [ -z "${CRON_SECRET}" ]; then
+            note "### ⚠️ 설정 누락: \`CRON_SECRET\`"
+            note "Settings → Secrets and variables → Actions → **Secrets** 탭에서"
+            note "\`CRON_SECRET\` 시크릿을 배포된 앱의 \`CRON_SECRET\` 환경변수와 동일한 값으로 추가하세요."
+            exit 0
+          fi
+
+          url="${SITE_URL%/}/api/cron/refresh"
+          body="$(mktemp)"
+          code=000
+          for attempt in 1 2 3; do
+            code=$(curl --silent --show-error --location \
+              --max-time 120 \
+              -o "$body" -w '%{http_code}' \
+              -H "Authorization: Bearer ${CRON_SECRET}" \
+              "$url") || code=000
+            case "$code" in
+              200) break ;;
+              401|403|404) break ;; # config problem, retrying won't help
+            esac
+            echo "attempt ${attempt}: HTTP ${code}, 재시도합니다"
+            if [ "$attempt" -lt 3 ]; then sleep 20; fi
+          done
+
+          case "$code" in
+            200)
+              note "### ✅ 갱신 완료"
+              printf '```json\n' >> "$GITHUB_STEP_SUMMARY"
+              head -c 2000 "$body" >> "$GITHUB_STEP_SUMMARY"
+              printf '\n```\n' >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            401|403)
+              note "### ⚠️ 인증 실패 (HTTP $code)"
+              note "리포지토리 Secret \`CRON_SECRET\`이 배포된 앱의 \`CRON_SECRET\` 환경변수와 다릅니다. 양쪽을 같은 값으로 맞춘 뒤 재배포하세요."
+              ;;
+            000)
+              note "### ⚠️ 서버에 연결하지 못했습니다"
+              note "타임아웃이거나 주소가 잘못됐습니다. \`SITE_URL\` 값(\`${SITE_URL}\`)이 실제 배포 주소인지 확인하세요."
+              ;;
+            404)
+              note "### ⚠️ HTTP 404"
+              note "\`${url}\` 경로를 찾을 수 없습니다. 배포가 최신 코드인지 확인하세요."
+              ;;
+            *)
+              note "### ⚠️ HTTP $code"
+              printf '```\n' >> "$GITHUB_STEP_SUMMARY"
+              head -c 1000 "$body" >> "$GITHUB_STEP_SUMMARY"
+              printf '\n```\n' >> "$GITHUB_STEP_SUMMARY"
+              ;;
+          esac
+          exit 0

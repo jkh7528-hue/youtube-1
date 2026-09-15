@@ -208,6 +208,8 @@ export interface RefreshSummary {
   newVideosDiscovered: number;
   videosStatsRefreshed: number;
   cardiacArrestCount: number;
+  /** True when the run stopped early to stay inside its time budget. The next run continues. */
+  timedOut: boolean;
   errors: string[];
 }
 
@@ -218,9 +220,21 @@ export interface RefreshSummary {
  * VPH/심정지 flags, and prunes old snapshot history.
  */
 export async function runRefreshJob(
-  opts: { maxPagesPerChannel?: number; maxStatsRefreshPerRun?: number } = {}
+  opts: {
+    maxPagesPerChannel?: number;
+    maxStatsRefreshPerRun?: number;
+    /**
+     * Wall-clock budget for the whole run. The host kills the request at its own
+     * limit (60s on Vercel Hobby) with no chance to report progress, so stop
+     * cleanly a little before that and let the next run continue instead.
+     */
+    budgetMs?: number;
+  } = {}
 ): Promise<RefreshSummary> {
   const settings = await getSettings();
+  const deadline = Date.now() + (opts.budgetMs ?? Number.POSITIVE_INFINITY);
+  const outOfTime = () => Date.now() >= deadline;
+  let timedOut = false;
   const errors: string[] = [];
   const touched = new Set<string>();
   let newVideosDiscovered = 0;
@@ -230,6 +244,10 @@ export async function runRefreshJob(
   if (chErr) throw new Error(chErr.message);
 
   for (const channel of channels ?? []) {
+    if (outOfTime()) {
+      timedOut = true;
+      break;
+    }
     try {
       const ready = await ensureChannelMetadata(channel as ChannelRow);
       const { newVideoDbIds } = await scanChannel(ready, opts.maxPagesPerChannel ?? 5);
@@ -247,10 +265,14 @@ export async function runRefreshJob(
   const maxStats = opts.maxStatsRefreshPerRun ?? 1500;
   const recentCutoff = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
 
+  // Ordered by staleness and capped: uncapped, this set grew with the catalog
+  // and a single run could never finish inside the host's function timeout.
   const { data: recentVideos, error: recentErr } = await supabaseAdmin
     .from("videos")
     .select("id, youtube_video_id")
-    .gte("published_at", recentCutoff);
+    .gte("published_at", recentCutoff)
+    .order("last_checked_at", { ascending: true, nullsFirst: true })
+    .limit(maxStats);
   if (recentErr) errors.push(recentErr.message);
 
   const recentList = recentVideos ?? [];
@@ -278,6 +300,10 @@ export async function runRefreshJob(
   let videosStatsRefreshed = 0;
   try {
     for (const batch of chunk(toRefresh, 500)) {
+      if (outOfTime()) {
+        timedOut = true;
+        break;
+      }
       const ids = await refreshStats(batch);
       ids.forEach((id) => touched.add(id));
       videosStatsRefreshed += ids.length;
@@ -305,6 +331,7 @@ export async function runRefreshJob(
     newVideosDiscovered,
     videosStatsRefreshed,
     cardiacArrestCount: count ?? 0,
+    timedOut,
     errors,
   };
 }
@@ -367,6 +394,7 @@ export async function scanSingleChannel(channelDbId: string): Promise<RefreshSum
     newVideosDiscovered,
     videosStatsRefreshed: touched.size - newVideosDiscovered,
     cardiacArrestCount: count ?? 0,
+    timedOut: false,
     errors,
   };
 }

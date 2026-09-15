@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import type { AppSettingsValue } from "@/lib/types";
 
@@ -16,7 +17,12 @@ export const DEFAULT_SETTINGS: AppSettingsValue = {
 
 const SETTINGS_KEY = "thresholds";
 
-export async function getSettings(): Promise<AppSettingsValue> {
+/**
+ * Deduped per request: the page shell reads settings for its subtitle and each
+ * query helper reads them again, which used to be a separate round trip every
+ * time. `cache()` collapses them into one.
+ */
+export const getSettings = cache(async function getSettings(): Promise<AppSettingsValue> {
   const { data, error } = await supabaseAdmin
     .from("app_settings")
     .select("value")
@@ -29,7 +35,7 @@ export async function getSettings(): Promise<AppSettingsValue> {
   }
   if (!data) return DEFAULT_SETTINGS;
   return { ...DEFAULT_SETTINGS, ...(data.value as Partial<AppSettingsValue>) };
-}
+});
 
 export async function updateSettings(
   partial: Partial<AppSettingsValue>

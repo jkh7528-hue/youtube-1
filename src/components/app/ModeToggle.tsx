@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Flame, Heartbeat } from "@phosphor-icons/react/dist/ssr";
+import LinkPending from "@/components/app/LinkPending";
 
 function hrefFor(mode: "trending" | "cardiac", category?: string) {
   const params = new URLSearchParams();
@@ -25,6 +26,7 @@ export default function ModeToggle({
       >
         <Flame size={15} weight={mode === "trending" ? "fill" : "regular"} />
         급상승
+        <LinkPending />
       </Link>
       <Link
         href={hrefFor("cardiac", category)}
@@ -34,6 +36,7 @@ export default function ModeToggle({
       >
         <Heartbeat size={15} weight={mode === "cardiac" ? "fill" : "regular"} />
         심정지
+        <LinkPending />
       </Link>
     </div>
   );
