@@ -44,8 +44,10 @@ jobs:
       CRON_SECRET: ${{ secrets.CRON_SECRET }}
       # No 60s serverless ceiling here, so one run can cover the whole catalog
       # instead of the slice an hourly schedule used to be enough for.
+      # Measured: 6,446 videos refreshed in 49s, so 600s is ample headroom.
+      # Keep CRON_MAX_STATS comfortably above the catalog size (~6.6k today).
       CRON_BUDGET_SECONDS: "600"
-      CRON_MAX_STATS: "5000"
+      CRON_MAX_STATS: "8000"
       # Leave APP_PASSWORD unset: the login gate stays off for this local boot.
 
     steps:

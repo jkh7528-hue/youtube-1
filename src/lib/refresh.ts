@@ -139,21 +139,75 @@ async function scanChannel(channel: ChannelRow, maxPages: number): Promise<ScanR
   return { newVideoDbIds, pagesUsed };
 }
 
+interface VideoRef {
+  id: string;
+  youtube_video_id: string;
+  channel_id: string;
+}
+
+/** PostgREST answers with at most 1000 rows per request. */
+const PAGE_SIZE = 1000;
+
+/**
+ * Videos due a recheck, oldest-checked first, paged past PostgREST's 1000-row
+ * response cap. A single `.limit(n)` above that silently truncates — which is
+ * why raising maxStatsRefreshPerRun past 1000 used to have no effect at all.
+ *
+ * "recent" is everything published inside the window (trending/flatlining shows
+ * up there first); "older" is the rotating remainder of the back catalog.
+ */
+async function fetchVideoRefs(
+  scope: "recent" | "older",
+  cutoff: string,
+  want: number,
+  errors: string[]
+): Promise<VideoRef[]> {
+  const out: VideoRef[] = [];
+  while (out.length < want) {
+    const take = Math.min(PAGE_SIZE, want - out.length);
+    let query = supabaseAdmin
+      .from("videos")
+      .select("id, youtube_video_id, channel_id")
+      .order("last_checked_at", { ascending: true, nullsFirst: true })
+      .range(out.length, out.length + take - 1);
+    query = scope === "recent" ? query.gte("published_at", cutoff) : query.lt("published_at", cutoff);
+
+    const { data, error } = await query;
+    if (error) {
+      errors.push(error.message);
+      break;
+    }
+    const page = data ?? [];
+    out.push(...page);
+    if (page.length < take) break; // ran out of rows
+  }
+  return out;
+}
+
 /** Re-fetches live stats for an already-tracked set of videos and records a new snapshot for each. */
 async function refreshStats(
-  videos: Array<{ id: string; youtube_video_id: string }>
+  videos: Array<{ id: string; youtube_video_id: string; channel_id: string }>
 ): Promise<string[]> {
   if (videos.length === 0) return [];
-  const idByYtId = new Map(videos.map((v) => [v.youtube_video_id, v.id]));
+  const byYtId = new Map(videos.map((v) => [v.youtube_video_id, v]));
   const stats = await fetchVideoStats(videos.map((v) => v.youtube_video_id));
   const now = new Date().toISOString();
 
   const updateRows = stats
     .map((s) => {
-      const id = idByYtId.get(s.videoId);
-      if (!id) return null;
+      const existing = byYtId.get(s.videoId);
+      if (!existing) return null;
       return {
-        id,
+        id: existing.id,
+        // These two are already-known values, resent on every refresh because
+        // PostgREST sends an upsert as INSERT ... ON CONFLICT: a column left
+        // out of the payload arrives as NULL and trips the NOT NULL check
+        // before the conflict clause ever runs. Omitting them failed every
+        // batch, which silently disabled the whole stats refresh — and with
+        // it VPH updates. videos' other NOT NULL columns (title,
+        // published_at) are refreshed below anyway; the rest have defaults.
+        youtube_video_id: s.videoId,
+        channel_id: existing.channel_id,
         title: s.title,
         thumbnail_url: s.thumbnailUrl,
         published_at: s.publishedAt,
@@ -265,30 +319,14 @@ export async function runRefreshJob(
   const maxStats = opts.maxStatsRefreshPerRun ?? 1500;
   const recentCutoff = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
 
-  // Ordered by staleness and capped: uncapped, this set grew with the catalog
-  // and a single run could never finish inside the host's function timeout.
-  const { data: recentVideos, error: recentErr } = await supabaseAdmin
-    .from("videos")
-    .select("id, youtube_video_id")
-    .gte("published_at", recentCutoff)
-    .order("last_checked_at", { ascending: true, nullsFirst: true })
-    .limit(maxStats);
-  if (recentErr) errors.push(recentErr.message);
-
-  const recentList = recentVideos ?? [];
+  // Both lists are ordered by staleness so each run picks up where the last
+  // one left off, and capped so a run can't grow unbounded with the catalog.
+  const recentList = await fetchVideoRefs("recent", recentCutoff, maxStats, errors);
   const remainingBudget = Math.max(maxStats - recentList.length, 0);
-
-  let olderList: Array<{ id: string; youtube_video_id: string }> = [];
-  if (remainingBudget > 0) {
-    const { data: older, error: olderErr } = await supabaseAdmin
-      .from("videos")
-      .select("id, youtube_video_id")
-      .lt("published_at", recentCutoff)
-      .order("last_checked_at", { ascending: true, nullsFirst: true })
-      .limit(remainingBudget);
-    if (olderErr) errors.push(olderErr.message);
-    olderList = older ?? [];
-  }
+  const olderList =
+    remainingBudget > 0
+      ? await fetchVideoRefs("older", recentCutoff, remainingBudget, errors)
+      : [];
 
   const seen = new Set<string>();
   const toRefresh = [...recentList, ...olderList].filter((v) => {
@@ -365,7 +403,7 @@ export async function scanSingleChannel(channelDbId: string): Promise<RefreshSum
     // reopening the channel page right after adding it shows fresh VPH too.
     const { data: existing } = await supabaseAdmin
       .from("videos")
-      .select("id, youtube_video_id")
+      .select("id, youtube_video_id, channel_id")
       .eq("channel_id", channel.id)
       .not("id", "in", `(${Array.from(touched).join(",") || "00000000-0000-0000-0000-000000000000"})`)
       .limit(500);
