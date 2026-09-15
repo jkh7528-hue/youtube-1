@@ -9,6 +9,7 @@ import {
 import { getSettings } from "@/lib/settings";
 import CategoryTabs from "@/components/app/CategoryTabs";
 import ModeToggle from "@/components/app/ModeToggle";
+import Pagination from "@/components/app/Pagination";
 import RefreshButton from "@/components/app/RefreshButton";
 import VideoGrid from "@/components/app/VideoGrid";
 import VideoGridSkeleton from "@/components/app/VideoGridSkeleton";
@@ -25,47 +26,59 @@ type Mode = "trending" | "cardiac";
 async function VideoResults({
   mode,
   category,
-  limit,
+  page,
 }: {
   mode: Mode;
   category?: string;
-  limit: number;
+  page: number;
 }) {
   const { videos, total } =
     mode === "cardiac"
-      ? await getCardiacArrestVideos({ categorySlug: category, limit })
-      : await getTrendingVideos({ categorySlug: category, limit });
+      ? await getCardiacArrestVideos({ categorySlug: category, page })
+      : await getTrendingVideos({ categorySlug: category, page });
 
-  const hasMore = videos.length < total;
-  const nextHref = (() => {
+  const totalPages = Math.max(1, Math.ceil(total / VIDEO_PAGE_SIZE));
+  const firstRow = (page - 1) * VIDEO_PAGE_SIZE + 1;
+
+  const hrefFor = (target: number) => {
     const params = new URLSearchParams();
     params.set("mode", mode);
     if (category) params.set("category", category);
-    params.set("limit", String(limit + VIDEO_PAGE_SIZE));
+    if (target > 1) params.set("page", String(target));
     return `/?${params.toString()}`;
-  })();
+  };
+
+  // A stale bookmark, or a page that emptied out since it was linked.
+  if (videos.length === 0 && page > 1) {
+    return (
+      <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-24 text-center">
+        <p className="text-sm font-medium text-zinc-500">{page}페이지에는 영상이 없어요.</p>
+        <Link
+          href={hrefFor(1)}
+          className="rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-zinc-300 transition-colors hover:bg-surface-hover"
+        >
+          1페이지로 가기
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
       {total > 0 && (
         <p className="-mt-2 text-xs text-zinc-500 tabular">
           전체 {total.toLocaleString("ko-KR")}개 중{" "}
-          <span className="font-semibold text-zinc-300">{videos.length.toLocaleString("ko-KR")}개</span> 표시
-          {" · "}본 영상은 아래로 내려갑니다
+          <span className="font-semibold text-zinc-300">
+            {firstRow.toLocaleString("ko-KR")}–{(firstRow + videos.length - 1).toLocaleString("ko-KR")}번째
+          </span>
+          {" · "}
+          {page}/{totalPages} 페이지{" · "}본 영상은 아래로 내려갑니다
         </p>
       )}
 
       <VideoGrid videos={videos} mode={mode} />
 
-      {hasMore && (
-        <Link
-          href={nextHref}
-          scroll={false}
-          className="self-center rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-semibold text-zinc-300 transition-colors hover:bg-surface-hover"
-        >
-          {Math.min(VIDEO_PAGE_SIZE, total - videos.length).toLocaleString("ko-KR")}개 더 보기
-        </Link>
-      )}
+      <Pagination current={page} totalPages={totalPages} hrefFor={hrefFor} />
     </div>
   );
 }
@@ -73,15 +86,14 @@ async function VideoResults({
 export default async function ExplorePage({
   searchParams,
 }: {
-  searchParams: Promise<{ mode?: string; category?: string; limit?: string }>;
+  searchParams: Promise<{ mode?: string; category?: string; page?: string }>;
 }) {
-  const { mode: rawMode, category, limit: rawLimit } = await searchParams;
+  const { mode: rawMode, category, page: rawPage } = await searchParams;
   const mode: Mode = rawMode === "cardiac" ? "cardiac" : "trending";
-  // Clamped so a hand-edited URL can't ask for the whole catalogue at once.
-  const parsedLimit = Number(rawLimit);
-  const limit = Number.isFinite(parsedLimit)
-    ? Math.min(Math.max(parsedLimit, VIDEO_PAGE_SIZE), 600)
-    : VIDEO_PAGE_SIZE;
+  // A junk or negative ?page= falls back to the first page; a page past the end
+  // just renders an empty grid with the pager still pointing home.
+  const parsedPage = Number(rawPage);
+  const page = Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
 
   // Two cheap single-table reads, run together — this is all the shell waits on.
   const [categories, settings] = await Promise.all([getCategories(), getSettings()]);
@@ -112,8 +124,8 @@ export default async function ExplorePage({
         re-suspends this boundary, so the skeleton comes back immediately
         instead of the old list sitting there frozen until the new query lands.
       */}
-      <Suspense key={`${mode}:${category ?? ""}:${limit}`} fallback={<VideoGridSkeleton />}>
-        <VideoResults mode={mode} category={category} limit={limit} />
+      <Suspense key={`${mode}:${category ?? ""}:${page}`} fallback={<VideoGridSkeleton />}>
+        <VideoResults mode={mode} category={category} page={page} />
       </Suspense>
     </div>
   );

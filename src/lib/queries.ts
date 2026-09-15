@@ -34,12 +34,22 @@ async function channelIdsForCategory(categorySlug: string): Promise<string[]> {
 export interface VideoListParams {
   categorySlug?: string;
   excludeShorts?: boolean;
-  limit?: number;
+  /** 1-based. Out-of-range pages simply come back empty. */
+  page?: number;
 }
 
-/** Default page size. The folder counts show the true total, so the list has to
- *  report how much of it is on screen or the two numbers look contradictory. */
+/** Rows per page. The folder counts show the true total, so the list has to
+ *  report which slice is on screen or the two numbers look contradictory. */
 export const VIDEO_PAGE_SIZE = 60;
+
+/** PostgREST's code for a .range() that begins beyond the last row. */
+const OUT_OF_RANGE = "PGRST103";
+
+/** Inclusive row bounds for a 1-based page number, as .range() wants them. */
+function pageRange(page?: number): [number, number] {
+  const from = (Math.max(1, page ?? 1) - 1) * VIDEO_PAGE_SIZE;
+  return [from, from + VIDEO_PAGE_SIZE - 1];
+}
 
 export interface VideoListResult {
   videos: VideoWithChannel[];
@@ -64,7 +74,7 @@ export async function getTrendingVideos(params: VideoListParams = {}): Promise<V
     // material you haven't looked at yet.
     .order("watched_at", { ascending: true, nullsFirst: true })
     .order("recent_vph", { ascending: false })
-    .limit(params.limit ?? VIDEO_PAGE_SIZE);
+    .range(...pageRange(params.page));
 
   if (params.excludeShorts ?? settings.excludeShortsByDefault) {
     query = query.eq("is_short", false);
@@ -77,7 +87,13 @@ export async function getTrendingVideos(params: VideoListParams = {}): Promise<V
   }
 
   const { data, error, count } = await query;
-  if (error) throw new Error(error.message);
+  if (error) {
+    // PostgREST answers 416 when ?page= starts past the last row. That's an
+    // out-of-range page, not a failure, so hand back an empty one and let the
+    // caller offer a way home.
+    if (error.code !== OUT_OF_RANGE) throw new Error(error.message);
+    return { videos: [], total: 0, settings };
+  }
   return {
     videos: (data ?? []) as unknown as VideoWithChannel[],
     total: count ?? 0,
@@ -97,7 +113,7 @@ export async function getCardiacArrestVideos(
     .eq("is_cardiac_arrest", true)
     .order("watched_at", { ascending: true, nullsFirst: true })
     .order("latest_view_count", { ascending: false })
-    .limit(params.limit ?? VIDEO_PAGE_SIZE);
+    .range(...pageRange(params.page));
 
   if (params.excludeShorts ?? settings.excludeShortsByDefault) {
     query = query.eq("is_short", false);
@@ -110,7 +126,13 @@ export async function getCardiacArrestVideos(
   }
 
   const { data, error, count } = await query;
-  if (error) throw new Error(error.message);
+  if (error) {
+    // PostgREST answers 416 when ?page= starts past the last row. That's an
+    // out-of-range page, not a failure, so hand back an empty one and let the
+    // caller offer a way home.
+    if (error.code !== OUT_OF_RANGE) throw new Error(error.message);
+    return { videos: [], total: 0, settings };
+  }
   return {
     videos: (data ?? []) as unknown as VideoWithChannel[],
     total: count ?? 0,
