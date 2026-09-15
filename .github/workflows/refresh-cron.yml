@@ -51,9 +51,9 @@ jobs:
       # Leave APP_PASSWORD unset: the login gate stays off for this local boot.
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
