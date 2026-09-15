@@ -12,8 +12,15 @@ export const maxDuration = 300;
 // next scheduled run. Must stay under the host's hard function timeout — Vercel
 // Hobby kills the request at 60s, and a killed request returns a 504 with no
 // progress reported, which is what made the hourly cron look permanently broken.
-// Raise CRON_BUDGET_SECONDS on a plan with a longer limit.
+// Raise CRON_BUDGET_SECONDS on a plan with a longer limit — the scheduled run
+// in .github/workflows/refresh-cron.yml boots the app inside the Actions runner,
+// which has hours rather than seconds, and sets both of these much higher.
 const BUDGET_SECONDS = Number(process.env.CRON_BUDGET_SECONDS ?? 50);
+
+// Hard cap on videos re-checked per run, independent of the time budget. The
+// schedule only fires twice a day now, so each run has to cover far more of the
+// catalog than it did when this ran hourly.
+const MAX_STATS = Number(process.env.CRON_MAX_STATS ?? 1500);
 
 function isAuthorized(request: NextRequest): boolean {
   const secret = env.cronSecret;
@@ -29,7 +36,10 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   try {
-    const summary = await runRefreshJob({ budgetMs: BUDGET_SECONDS * 1000 });
+    const summary = await runRefreshJob({
+      budgetMs: BUDGET_SECONDS * 1000,
+      maxStatsRefreshPerRun: MAX_STATS,
+    });
     return NextResponse.json({ ok: true, ...summary });
   } catch (e) {
     console.error("[cron/refresh] failed:", e);

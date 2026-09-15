@@ -191,6 +191,51 @@ export async function getChannels(): Promise<ChannelWithCategories[]> {
   }));
 }
 
+/** Sentinel slug for the "no category yet" folder. `slugify()` in actions.ts
+ *  strips every non letter/digit, so a real category slug can never start with
+ *  an underscore and can never collide with this. */
+export const UNCATEGORIZED_SLUG = "_none";
+
+export interface ChannelFolder {
+  /** null for the 미분류 folder. */
+  category: CategoryRow | null;
+  channels: ChannelWithCategories[];
+  videoCount: number;
+  cardiacArrestCount: number;
+}
+
+/**
+ * Channels grouped into category folders for /channels.
+ *
+ * Grouping happens here rather than in SQL: getChannels() already makes the
+ * only round trips needed (channels + category links + the stats view), and a
+ * channel belongs to zero or more categories, so it legitimately shows up in
+ * several folders at once.
+ *
+ * 미분류 is always last and always present, even when empty — it is the entry
+ * point for adding a channel that doesn't belong to a category yet.
+ */
+export async function getChannelFolders(): Promise<ChannelFolder[]> {
+  const [channels, categories] = await Promise.all([getChannels(), getCategories()]);
+
+  const build = (category: CategoryRow | null, members: ChannelWithCategories[]): ChannelFolder => ({
+    category,
+    channels: members,
+    videoCount: members.reduce((sum, c) => sum + c.videoCount, 0),
+    cardiacArrestCount: members.reduce((sum, c) => sum + c.cardiacArrestCount, 0),
+  });
+
+  const folders = categories.map((category) =>
+    build(
+      category,
+      channels.filter((ch) => ch.categories.some((c) => c.id === category.id))
+    )
+  );
+
+  folders.push(build(null, channels.filter((ch) => ch.categories.length === 0)));
+  return folders;
+}
+
 export async function getChannelDetail(channelId: string): Promise<{
   channel: ChannelWithCategories | null;
   cardiacArrestVideos: VideoWithChannel[];

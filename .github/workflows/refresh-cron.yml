@@ -1,20 +1,31 @@
 name: Refresh YouTube stats
 
-# Polls the deployed app's cron endpoint on a schedule so VPH keeps updating.
+# Collects new uploads and refreshes VPH twice a day.
 #
-# Setup (Settings → Secrets and variables → Actions on this repo):
-#   - Variable SITE_URL   → e.g. https://your-app.vercel.app (no trailing slash)
-#   - Secret   CRON_SECRET → same value as the CRON_SECRET env var on the deployment
+# This job does NOT need the app to be deployed anywhere. It builds the app in
+# the runner, starts it on localhost, and calls its own cron endpoint — so the
+# whole pipeline lives in this repo. (The earlier version curl'd a deployed
+# SITE_URL that never existed, which is why every scheduled run failed.)
 #
-# This job intentionally always exits 0 so a bad run never sends a "Run failed"
-# email every hour. The outcome — success or the reason it didn't work — is
-# written to the run's Job Summary instead. Check there, not the step log.
+# Setup — Settings → Secrets and variables → Actions → Secrets:
+#   NEXT_PUBLIC_SUPABASE_URL
+#   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+#   SUPABASE_SECRET_KEY
+#   YOUTUBE_API_KEY
+#   CRON_SECRET          (any long random string; only used inside this job)
+#
+# The job always exits 0 so a bad run never sends a "Run failed" email. The
+# outcome — success or the reason it didn't work — goes to the run's Job
+# Summary. Check there, not the step log.
 on:
   schedule:
-    - cron: "0 * * * *" # every hour, on the hour (UTC)
+    # GitHub runs cron in UTC. KST is UTC+9.
+    - cron: "0 23 * * *" # 08:00 KST (아침)
+    - cron: "0 13 * * *" # 22:00 KST (저녁 10시)
   workflow_dispatch: {}
 
-permissions: {}
+permissions:
+  contents: read
 
 concurrency:
   group: refresh-cron
@@ -23,69 +34,117 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      # No 60s serverless ceiling here, so one run can cover the whole catalog
+      # instead of the slice an hourly schedule used to be enough for.
+      CRON_BUDGET_SECONDS: "600"
+      CRON_MAX_STATS: "5000"
+      # Leave APP_PASSWORD unset: the login gate stays off for this local boot.
+
     steps:
-      - name: Call refresh endpoint
-        env:
-          SITE_URL: ${{ vars.SITE_URL }}
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Check required secrets
+        id: precheck
         run: |
           set -u
-          note() { echo "$1"; echo "$1" >> "$GITHUB_STEP_SUMMARY"; }
-
-          if [ -z "${SITE_URL}" ]; then
-            note "### ⚠️ 설정 누락: \`SITE_URL\`"
-            note "Settings → Secrets and variables → Actions → **Variables** 탭에서"
-            note "\`SITE_URL\` 변수에 배포 주소(예: \`https://your-app.vercel.app\`, 끝에 \`/\` 없이)를 추가하세요."
-            exit 0
-          fi
-          if [ -z "${CRON_SECRET}" ]; then
-            note "### ⚠️ 설정 누락: \`CRON_SECRET\`"
-            note "Settings → Secrets and variables → Actions → **Secrets** 탭에서"
-            note "\`CRON_SECRET\` 시크릿을 배포된 앱의 \`CRON_SECRET\` 환경변수와 동일한 값으로 추가하세요."
-            exit 0
-          fi
-
-          url="${SITE_URL%/}/api/cron/refresh"
-          body="$(mktemp)"
-          code=000
-          for attempt in 1 2 3; do
-            code=$(curl --silent --show-error --location \
-              --max-time 120 \
-              -o "$body" -w '%{http_code}' \
-              -H "Authorization: Bearer ${CRON_SECRET}" \
-              "$url") || code=000
-            case "$code" in
-              200) break ;;
-              401|403|404) break ;; # config problem, retrying won't help
-            esac
-            echo "attempt ${attempt}: HTTP ${code}, 재시도합니다"
-            if [ "$attempt" -lt 3 ]; then sleep 20; fi
+          missing=""
+          for name in NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY SUPABASE_SECRET_KEY YOUTUBE_API_KEY CRON_SECRET; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
           done
+          if [ -n "$missing" ]; then
+            {
+              echo "### ⚠️ 설정 누락"
+              echo ""
+              echo "다음 시크릿이 비어 있어 스캔을 건너뛰었습니다:"
+              for name in $missing; do echo "- \`$name\`"; done
+              echo ""
+              echo "Settings → Secrets and variables → Actions → **Secrets** 에서 추가하세요."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
 
-          case "$code" in
-            200)
-              note "### ✅ 갱신 완료"
-              printf '```json\n' >> "$GITHUB_STEP_SUMMARY"
-              head -c 2000 "$body" >> "$GITHUB_STEP_SUMMARY"
-              printf '\n```\n' >> "$GITHUB_STEP_SUMMARY"
-              ;;
-            401|403)
-              note "### ⚠️ 인증 실패 (HTTP $code)"
-              note "리포지토리 Secret \`CRON_SECRET\`이 배포된 앱의 \`CRON_SECRET\` 환경변수와 다릅니다. 양쪽을 같은 값으로 맞춘 뒤 재배포하세요."
-              ;;
-            000)
-              note "### ⚠️ 서버에 연결하지 못했습니다"
-              note "타임아웃이거나 주소가 잘못됐습니다. \`SITE_URL\` 값(\`${SITE_URL}\`)이 실제 배포 주소인지 확인하세요."
-              ;;
-            404)
-              note "### ⚠️ HTTP 404"
-              note "\`${url}\` 경로를 찾을 수 없습니다. 배포가 최신 코드인지 확인하세요."
-              ;;
-            *)
-              note "### ⚠️ HTTP $code"
-              printf '```\n' >> "$GITHUB_STEP_SUMMARY"
-              head -c 1000 "$body" >> "$GITHUB_STEP_SUMMARY"
-              printf '\n```\n' >> "$GITHUB_STEP_SUMMARY"
-              ;;
-          esac
+      # continue-on-error on the next three steps keeps a broken build or a
+      # failed boot from failing the job — which would put the hourly "Run
+      # failed" email right back. The scan step reports what went wrong to the
+      # Job Summary instead.
+      - name: Install dependencies
+        if: steps.precheck.outputs.ready == 'true'
+        continue-on-error: true
+        run: npm ci
+
+      - name: Build
+        if: steps.precheck.outputs.ready == 'true'
+        continue-on-error: true
+        run: npx next build
+
+      - name: Start app
+        if: steps.precheck.outputs.ready == 'true'
+        continue-on-error: true
+        run: |
+          set -u
+          npx next start -p 3000 > "$RUNNER_TEMP/app.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/app.pid"
+          for i in $(seq 1 60); do
+            if curl --silent --output /dev/null --max-time 2 http://localhost:3000/login; then
+              echo "app is up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "app did not come up in 60s"
+          tail -50 "$RUNNER_TEMP/app.log" || true
+          exit 1
+
+      - name: Run scan
+        if: steps.precheck.outputs.ready == 'true'
+        run: |
+          set -u
+          body="$RUNNER_TEMP/scan.json"
+          code=$(curl --silent --show-error \
+            --max-time 1500 \
+            -o "$body" -w '%{http_code}' \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            http://localhost:3000/api/cron/refresh) || code=000
+
+          if [ "$code" = "200" ]; then
+            echo "### ✅ 스캔 완료" >> "$GITHUB_STEP_SUMMARY"
+            printf '```json\n' >> "$GITHUB_STEP_SUMMARY"
+            head -c 2000 "$body" >> "$GITHUB_STEP_SUMMARY"
+            printf '\n```\n' >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`timedOut: true\` 이면 예산 안에서 다 못 돌았다는 뜻이고, 다음 실행이 이어서 처리합니다." >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "### ⚠️ 스캔 실패 (HTTP $code)"
+              printf '```\n'
+              head -c 1500 "$body" 2>/dev/null || echo "(응답 본문 없음)"
+              printf '\n```\n'
+              echo "앱 로그 마지막 30줄:"
+              printf '```\n'
+              tail -30 "$RUNNER_TEMP/app.log" 2>/dev/null || echo "(로그 없음)"
+              printf '\n```\n'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Stop app
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/app.pid" ]; then
+            kill "$(cat "$RUNNER_TEMP/app.pid")" 2>/dev/null || true
+          fi
           exit 0

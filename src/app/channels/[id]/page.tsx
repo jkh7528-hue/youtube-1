@@ -11,10 +11,12 @@ export const dynamic = "force-dynamic";
 
 export default async function ChannelDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
 }) {
-  const { id } = await params;
+  const [{ id }, { from }] = await Promise.all([params, searchParams]);
   const [{ channel, cardiacArrestVideos, recentVideos }, categories] = await Promise.all([
     getChannelDetail(id),
     getCategories(),
@@ -22,10 +24,14 @@ export default async function ChannelDetailPage({
 
   if (!channel) notFound();
 
+  // `from` is the folder slug you came in through, so going back lands you
+  // where you were instead of at the top-level folder grid.
+  const backHref = from ? `/channels?category=${encodeURIComponent(from)}` : "/channels";
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
-      <Link href="/channels" className="mb-4 flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-200">
-        <CaretLeft size={14} /> 관심채널 목록
+      <Link href={backHref} className="mb-4 flex w-fit items-center gap-1 text-sm text-zinc-500 hover:text-zinc-200">
+        <CaretLeft size={14} /> {from ? "폴더로 돌아가기" : "관심채널 목록"}
       </Link>
 
       <div className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-5 sm:flex-row sm:items-center sm:justify-between">

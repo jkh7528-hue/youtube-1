@@ -10,7 +10,14 @@ async function action(_prev: State, formData: FormData): Promise<State> {
   return addChannel(formData);
 }
 
-export default function ChannelForm({ categories }: { categories: CategoryRow[] }) {
+export default function ChannelForm({
+  categories,
+  preselectedIds = [],
+}: {
+  categories: CategoryRow[];
+  /** Ticked on mount — the folder you're adding from, so the channel lands there. */
+  preselectedIds?: string[];
+}) {
   const [state, formAction, pending] = useActionState<State, FormData>(action, {});
 
   return (
@@ -40,7 +47,13 @@ export default function ChannelForm({ categories }: { categories: CategoryRow[] 
                 key={c.id}
                 className="flex cursor-pointer items-center gap-1.5 rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-300 has-checked:border-cardiac has-checked:bg-cardiac/10 has-checked:text-cardiac"
               >
-                <input type="checkbox" name="categoryIds" value={c.id} className="hidden" />
+                <input
+                  type="checkbox"
+                  name="categoryIds"
+                  value={c.id}
+                  defaultChecked={preselectedIds.includes(c.id)}
+                  className="hidden"
+                />
                 {c.name}
               </label>
             ))}

@@ -63,28 +63,44 @@ npm install
 npm run dev
 ```
 
-`http://localhost:3000` 접속 → 비밀번호 입력 → `/channels`에서 관심채널을 하나 추가해보세요.
+`http://localhost:3000` 접속 → 비밀번호 입력 → `/channels`에서 카테고리 폴더를 열고
+그 안에서 관심채널을 하나 추가해보세요. 폴더 안에서 추가하면 그 카테고리가 자동으로 선택됩니다.
 채널을 추가하면 즉시 일부 영상을 가져오지만(최대 10페이지, 약 500개), 전체 백필과 VPH 계산은
 아래 cron이 주기적으로 돌아야 완성됩니다.
 
 ### 5. 주기적 수집(cron) 연결 — 필수
 
-`POST/GET /api/cron/refresh`를 `Authorization: Bearer <CRON_SECRET>` 헤더와 함께 주기적으로
-호출해야 새 영상이 발견되고 VPH가 계산됩니다.
+`.github/workflows/refresh-cron.yml`이 **하루 두 번** 수집을 돌립니다 — 아침 8시, 저녁 10시(KST).
+GitHub Actions는 UTC로 돌기 때문에 워크플로에는 `0 23 * * *`과 `0 13 * * *`으로 적혀 있습니다.
 
-**GitHub Actions로 연결 (권장, 무료)**
+**배포가 필요 없습니다.** 이 잡은 러너 안에서 `next build` → `next start`를 한 뒤
+자기 자신의 `/api/cron/refresh`를 호출합니다. 예전에는 배포된 `SITE_URL`을 curl로 찔렀는데,
+그 주소가 존재하지 않아 예약된 실행이 전부 실패했습니다.
 
-이미 `.github/workflows/refresh-cron.yml`이 포함돼 있습니다 (매시 정각 실행).
-저장소 Settings → Secrets and variables → Actions에서:
-- Variable `SITE_URL` = 배포된 주소 (예: `https://your-app.vercel.app`)
-- Secret `CRON_SECRET` = `.env`의 `CRON_SECRET`과 동일한 값
+저장소 Settings → Secrets and variables → Actions → **Secrets** 에 5개를 등록하세요.
+`.env.local`에 쓰는 값과 같습니다:
 
-> Vercel 자체 Cron Jobs 기능은 Hobby 플랜에서 하루 1회로 제한돼 있어(매시간 실행 불가,
-> Pro 플랜 필요) 쓰지 않습니다. `vercel.json`에는 cron 설정이 없습니다.
+| 시크릿 | 설명 |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase 프로젝트 URL |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | publishable(anon) key |
+| `SUPABASE_SECRET_KEY` | secret(service_role) key |
+| `YOUTUBE_API_KEY` | YouTube Data API v3 키 |
+| `CRON_SECRET` | 아무 긴 임의 문자열 (이 잡 안에서만 씁니다) |
 
-이 워크플로는 **항상 성공으로 끝납니다**(exit 0). 매시간 "Run failed" 메일이 오는 걸 막기
-위해서입니다. 대신 매 실행의 **Job Summary**(Actions 탭 → 실행 클릭 → 요약 화면)에 결과나
-실패 원인이 한국어로 적힙니다. 갱신이 안 되는 것 같으면 로그가 아니라 거기를 보세요.
+하나라도 비어 있으면 스캔을 건너뛰고 **무엇이 비었는지 Job Summary에 적어줍니다.**
+
+이 워크플로는 **항상 성공으로 끝납니다**(exit 0). "Run failed" 메일이 오는 걸 막기 위해서이고,
+빌드 실패나 기동 실패도 잡을 실패시키지 않습니다. 대신 매 실행의 **Job Summary**(Actions 탭 →
+실행 클릭 → 요약 화면)에 결과나 실패 원인이 한국어로 적힙니다. 갱신이 안 되는 것 같으면
+로그가 아니라 거기를 보세요.
+
+> 덤: 하루 두 번 Supabase에 접속하므로, 무료 플랜이 장기 미사용으로 프로젝트를 자동 정지시키는
+> 것도 예방됩니다.
+
+**하루 2회의 대가.** 새 영상의 첫 VPH가 잡히는 시점이 발견 후 ~1시간에서 **~10~14시간**으로
+늦어지고(스냅샷 두 개가 1시간 이상 벌어져야 계산됨), 급상승 순위도 하루 두 번만 바뀝니다.
+VPH 값 자체는 두 스냅샷의 실제 경과 시간으로 나누므로 정확합니다.
 
 ## 판정 기준 조정
 
@@ -101,6 +117,7 @@ Vercel에 연결하고(또는 다른 Node 호스팅) 위 환경변수를 프로�
 됩니다.
 
 수집 작업은 호스트가 함수를 강제 종료하기 전에 **스스로 멈추고 다음 실행에 넘깁니다.**
+한 번에 다시 확인할 영상 수의 상한은 `CRON_MAX_STATS`(기본 **1500**)로 정합니다.
 한 번의 실행이 쓸 수 있는 시간은 `CRON_BUDGET_SECONDS` 환경변수로 정하며 기본값은 **50초**로,
 Vercel Hobby의 60초 하드 리밋 안에 들어갑니다. Pro 이상(최대 300초)이라면 `CRON_BUDGET_SECONDS`를
 `250` 정도로 올리면 한 번에 더 많이 처리합니다. 예산을 넘겨 중단되면 응답 JSON의
