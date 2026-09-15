@@ -1,5 +1,11 @@
 import { Suspense } from "react";
-import { getCategories, getTrendingVideos, getCardiacArrestVideos } from "@/lib/queries";
+import Link from "next/link";
+import {
+  getCategories,
+  getTrendingVideos,
+  getCardiacArrestVideos,
+  VIDEO_PAGE_SIZE,
+} from "@/lib/queries";
 import { getSettings } from "@/lib/settings";
 import CategoryTabs from "@/components/app/CategoryTabs";
 import ModeToggle from "@/components/app/ModeToggle";
@@ -16,22 +22,66 @@ type Mode = "trending" | "cardiac";
  * The slow half of the page. Kept in its own component so the shell — heading,
  * category tabs, mode toggle — renders and stays clickable while this streams.
  */
-async function VideoResults({ mode, category }: { mode: Mode; category?: string }) {
-  const { videos } =
+async function VideoResults({
+  mode,
+  category,
+  limit,
+}: {
+  mode: Mode;
+  category?: string;
+  limit: number;
+}) {
+  const { videos, total } =
     mode === "cardiac"
-      ? await getCardiacArrestVideos({ categorySlug: category })
-      : await getTrendingVideos({ categorySlug: category });
+      ? await getCardiacArrestVideos({ categorySlug: category, limit })
+      : await getTrendingVideos({ categorySlug: category, limit });
 
-  return <VideoGrid videos={videos} mode={mode} />;
+  const hasMore = videos.length < total;
+  const nextHref = (() => {
+    const params = new URLSearchParams();
+    params.set("mode", mode);
+    if (category) params.set("category", category);
+    params.set("limit", String(limit + VIDEO_PAGE_SIZE));
+    return `/?${params.toString()}`;
+  })();
+
+  return (
+    <div className="flex flex-col gap-6">
+      {total > 0 && (
+        <p className="-mt-2 text-xs text-zinc-500 tabular">
+          전체 {total.toLocaleString("ko-KR")}개 중{" "}
+          <span className="font-semibold text-zinc-300">{videos.length.toLocaleString("ko-KR")}개</span> 표시
+          {" · "}본 영상은 아래로 내려갑니다
+        </p>
+      )}
+
+      <VideoGrid videos={videos} mode={mode} />
+
+      {hasMore && (
+        <Link
+          href={nextHref}
+          scroll={false}
+          className="self-center rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-semibold text-zinc-300 transition-colors hover:bg-surface-hover"
+        >
+          {Math.min(VIDEO_PAGE_SIZE, total - videos.length).toLocaleString("ko-KR")}개 더 보기
+        </Link>
+      )}
+    </div>
+  );
 }
 
 export default async function ExplorePage({
   searchParams,
 }: {
-  searchParams: Promise<{ mode?: string; category?: string }>;
+  searchParams: Promise<{ mode?: string; category?: string; limit?: string }>;
 }) {
-  const { mode: rawMode, category } = await searchParams;
+  const { mode: rawMode, category, limit: rawLimit } = await searchParams;
   const mode: Mode = rawMode === "cardiac" ? "cardiac" : "trending";
+  // Clamped so a hand-edited URL can't ask for the whole catalogue at once.
+  const parsedLimit = Number(rawLimit);
+  const limit = Number.isFinite(parsedLimit)
+    ? Math.min(Math.max(parsedLimit, VIDEO_PAGE_SIZE), 600)
+    : VIDEO_PAGE_SIZE;
 
   // Two cheap single-table reads, run together — this is all the shell waits on.
   const [categories, settings] = await Promise.all([getCategories(), getSettings()]);
@@ -62,8 +112,8 @@ export default async function ExplorePage({
         re-suspends this boundary, so the skeleton comes back immediately
         instead of the old list sitting there frozen until the new query lands.
       */}
-      <Suspense key={`${mode}:${category ?? ""}`} fallback={<VideoGridSkeleton />}>
-        <VideoResults mode={mode} category={category} />
+      <Suspense key={`${mode}:${category ?? ""}:${limit}`} fallback={<VideoGridSkeleton />}>
+        <VideoResults mode={mode} category={category} limit={limit} />
       </Suspense>
     </div>
   );

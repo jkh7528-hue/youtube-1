@@ -186,6 +186,24 @@ export async function rescanChannel(channelId: string): Promise<{ error?: string
 }
 
 // ---------------------------------------------------------------------------
+// 본 영상
+// ---------------------------------------------------------------------------
+
+/**
+ * Records that a video was opened, so list queries can sort it to the bottom.
+ *
+ * Deliberately does NOT revalidate: the card marks itself watched on click and
+ * the row only moves on the next load. Re-sorting the grid under the cursor
+ * mid-browse would be worse than waiting.
+ */
+export async function markVideoWatched(videoId: string, watched = true): Promise<void> {
+  await supabaseAdmin
+    .from("videos")
+    .update({ watched_at: watched ? new Date().toISOString() : null })
+    .eq("id", videoId);
+}
+
+// ---------------------------------------------------------------------------
 // Settings
 // ---------------------------------------------------------------------------
 

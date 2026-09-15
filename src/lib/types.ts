@@ -37,6 +37,8 @@ export interface VideoRow {
   recent_vph: number | null;
   is_cardiac_arrest: boolean;
   last_checked_at: string | null;
+  /** Set the first time the video is opened from a list; null means unwatched. */
+  watched_at: string | null;
   created_at: string;
 }
 

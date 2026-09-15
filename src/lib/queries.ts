@@ -37,11 +37,19 @@ export interface VideoListParams {
   limit?: number;
 }
 
-/** 급상승: recently published videos ranked by current VPH, descending. */
-export async function getTrendingVideos(params: VideoListParams = {}): Promise<{
+/** Default page size. The folder counts show the true total, so the list has to
+ *  report how much of it is on screen or the two numbers look contradictory. */
+export const VIDEO_PAGE_SIZE = 60;
+
+export interface VideoListResult {
   videos: VideoWithChannel[];
+  /** Matching rows in the database, ignoring the limit. */
+  total: number;
   settings: Awaited<ReturnType<typeof getSettings>>;
-}> {
+}
+
+/** 급상승: recently published videos ranked by current VPH, descending. */
+export async function getTrendingVideos(params: VideoListParams = {}): Promise<VideoListResult> {
   const settings = await getSettings();
   const cutoff = new Date(
     Date.now() - settings.trendingLookbackDays * 24 * 3600 * 1000
@@ -49,11 +57,14 @@ export async function getTrendingVideos(params: VideoListParams = {}): Promise<{
 
   let query = supabaseAdmin
     .from("videos")
-    .select(VIDEO_WITH_CHANNEL_SELECT)
+    .select(VIDEO_WITH_CHANNEL_SELECT, { count: "exact" })
     .gte("published_at", cutoff)
     .not("recent_vph", "is", null)
+    // Already-opened videos sink to the bottom so the top of the list is always
+    // material you haven't looked at yet.
+    .order("watched_at", { ascending: true, nullsFirst: true })
     .order("recent_vph", { ascending: false })
-    .limit(params.limit ?? 60);
+    .limit(params.limit ?? VIDEO_PAGE_SIZE);
 
   if (params.excludeShorts ?? settings.excludeShortsByDefault) {
     query = query.eq("is_short", false);
@@ -61,28 +72,32 @@ export async function getTrendingVideos(params: VideoListParams = {}): Promise<{
 
   if (params.categorySlug) {
     const channelIds = await channelIdsForCategory(params.categorySlug);
-    if (channelIds.length === 0) return { videos: [], settings };
+    if (channelIds.length === 0) return { videos: [], total: 0, settings };
     query = query.in("channel_id", channelIds);
   }
 
-  const { data, error } = await query;
+  const { data, error, count } = await query;
   if (error) throw new Error(error.message);
-  return { videos: (data ?? []) as unknown as VideoWithChannel[], settings };
+  return {
+    videos: (data ?? []) as unknown as VideoWithChannel[],
+    total: count ?? 0,
+    settings,
+  };
 }
 
 /** 심정지: high lifetime views but a current VPH that's flatlined. */
-export async function getCardiacArrestVideos(params: VideoListParams = {}): Promise<{
-  videos: VideoWithChannel[];
-  settings: Awaited<ReturnType<typeof getSettings>>;
-}> {
+export async function getCardiacArrestVideos(
+  params: VideoListParams = {}
+): Promise<VideoListResult> {
   const settings = await getSettings();
 
   let query = supabaseAdmin
     .from("videos")
-    .select(VIDEO_WITH_CHANNEL_SELECT)
+    .select(VIDEO_WITH_CHANNEL_SELECT, { count: "exact" })
     .eq("is_cardiac_arrest", true)
+    .order("watched_at", { ascending: true, nullsFirst: true })
     .order("latest_view_count", { ascending: false })
-    .limit(params.limit ?? 60);
+    .limit(params.limit ?? VIDEO_PAGE_SIZE);
 
   if (params.excludeShorts ?? settings.excludeShortsByDefault) {
     query = query.eq("is_short", false);
@@ -90,13 +105,17 @@ export async function getCardiacArrestVideos(params: VideoListParams = {}): Prom
 
   if (params.categorySlug) {
     const channelIds = await channelIdsForCategory(params.categorySlug);
-    if (channelIds.length === 0) return { videos: [], settings };
+    if (channelIds.length === 0) return { videos: [], total: 0, settings };
     query = query.in("channel_id", channelIds);
   }
 
-  const { data, error } = await query;
+  const { data, error, count } = await query;
   if (error) throw new Error(error.message);
-  return { videos: (data ?? []) as unknown as VideoWithChannel[], settings };
+  return {
+    videos: (data ?? []) as unknown as VideoWithChannel[],
+    total: count ?? 0,
+    settings,
+  };
 }
 
 interface ChannelVideoStats {
